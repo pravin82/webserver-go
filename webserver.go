@@ -3,9 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"net"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -26,7 +24,7 @@ func main() {
 			fmt.Println("Error Accepting connection", err)
 			continue
 		}
-		handleConnection(conn)
+		go handleConnection(conn)
 
 	}
 
@@ -42,12 +40,18 @@ func handleConnection(conn net.Conn) {
 		fmt.Println("Error reading from Connection", err)
 		return
 	}
-	statusLine := "HTTP/1.1 200 OK"
-	filePath := "index.html"
+
+	var statusLine, filePath string
 	path := extractPath(request)
-	if path != "GET / HTTP/1.1\r" {
-		statusLine = "HTTP/1.1 404 NOT FOUND"
-		filePath = "404.html"
+
+	switch path {
+	case "GET / HTTP/1.1\r":
+		statusLine, filePath = "HTTP/1.1 200 OK", "index.html"
+	case "GET /sleep HTTP/1.1\r":
+		time.Sleep(15 * time.Second)
+		statusLine, filePath = "HTTP/1.1 200 OK", "index.html"
+	default:
+		statusLine, filePath = "HTTP/1.1 404 NOT FOUND", "404.html"
 	}
 	fmt.Println("Path of request ", path)
 	fileContent, err := readFile(filePath)
@@ -86,12 +90,6 @@ func readHTTPRequest(reader *bufio.Reader) (string, error) {
 
 	// Combine the request lines into a single string
 	return strings.Join(requestLines, ""), nil
-}
-
-func sleep(writer http.ResponseWriter, request *http.Request) {
-	duration := 15 * time.Second
-	time.Sleep(duration)
-	io.WriteString(writer, "Response after sleep")
 }
 
 func readFile(urlPath string) (string, error) {
